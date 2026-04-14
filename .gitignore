@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+
+# Environment variables
+.env
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# Data sets
+*.csv
+*.zip
+data/raw/
+data/processed/
+
+# OS files
+.DS_Store
+Thumbs.db
