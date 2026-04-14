@@ -29,6 +29,11 @@ from preprocess import (
     save_preprocessed_data,
 )
 from eda import run_all_plots, print_basic_summary_statistics
+from demand_dataset import (
+    get_station_hour_demand_path,
+    create_station_hour_demand_dataset,
+    save_station_hour_demand_dataset,
+)
 
 
 def get_project_root() -> Path:
@@ -59,6 +64,7 @@ def main(
 
     cleaned_path = get_cleaned_data_path(year=year)
     station_path = get_station_level_data_path(year=year)
+    demand_path = get_station_hour_demand_path(year=year)
 
     # Step 1 + 2 (cached): load processed data if available, otherwise preprocess raw data
     if cleaned_path.exists() and not force_preprocess:
@@ -89,12 +95,21 @@ def main(
         print("Saving preprocessed datasets to data/processed/ ...")
         save_preprocessed_data(trips_clean, station_trips, year=year)
 
-    # Step 3: Run EDA and generate plots (cached per-figure unless forced)
-    print("\nStep 3: Running exploratory data analysis (EDA)...")
+    # Step 3: Build station-hour demand dataset (cached unless forced preprocess)
+    if demand_path.exists() and not force_preprocess:
+        print("\nStep 3: Using cached station-hour demand dataset...")
+        print(f"Using existing file: {demand_path}")
+    else:
+        print("\nStep 3: Creating station-hour demand dataset...")
+        station_hour_demand_df = create_station_hour_demand_dataset(trips_clean)
+        save_station_hour_demand_dataset(station_hour_demand_df, year=year)
+
+    # Step 4: Run EDA and generate plots (cached per-figure unless forced)
+    print("\nStep 4: Running exploratory data analysis (EDA)...")
     run_all_plots(trips_clean, station_trips, force_plots=force_plots)
 
     # 5) Print basic summary statistics to the console
-    print("\nStep 4: Printing summary statistics...")
+    print("\nStep 5: Printing summary statistics...")
     print_basic_summary_statistics(trips_clean)
 
     print("=== Pipeline completed successfully. ===")
