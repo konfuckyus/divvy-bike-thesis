@@ -1,0 +1,6 @@
+--- Enriched Dataset Output Summary (2025) ---
+Total rows: 1,740,120
+Weather time range appended: 2024-12-30 18:00:00 to 2025-12-31 17:00:00
+Timezone Logic: UTC to America/Chicago Naive (matches Divvy started_at timezone)
+Number of Federal Holidays added: 11
+Custom Events modeled: St. Patrick's Weekend, Lollapalooza, Chicago Marathon
