@@ -1,0 +1,7 @@
+{
+    "total_rides": 5393325,
+    "num_stations": 1865,
+    "forecast_level": "hourly",
+    "best_model": "RandomForestRegressor",
+    "main_experiment": "busy_top20"
+}

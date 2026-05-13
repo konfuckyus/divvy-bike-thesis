@@ -1,0 +1,62 @@
+[
+    {
+        "start_station_name":"Kingsbury St & Kinzie St",
+        "ride_count":40131
+    },
+    {
+        "start_station_name":"DuSable Lake Shore Dr & Monroe St",
+        "ride_count":38816
+    },
+    {
+        "start_station_name":"Navy Pier",
+        "ride_count":34485
+    },
+    {
+        "start_station_name":"Michigan Ave & Oak St",
+        "ride_count":34484
+    },
+    {
+        "start_station_name":"DuSable Lake Shore Dr & North Blvd",
+        "ride_count":33121
+    },
+    {
+        "start_station_name":"Clinton St & Washington Blvd",
+        "ride_count":30308
+    },
+    {
+        "start_station_name":"Clark St & Elm St",
+        "ride_count":29510
+    },
+    {
+        "start_station_name":"Streeter Dr & Grand Ave",
+        "ride_count":29509
+    },
+    {
+        "start_station_name":"Canal St & Madison St",
+        "ride_count":28864
+    },
+    {
+        "start_station_name":"Clinton St & Madison St",
+        "ride_count":28602
+    },
+    {
+        "start_station_name":"Wells St & Concord Ln",
+        "ride_count":27032
+    },
+    {
+        "start_station_name":"Millennium Park",
+        "ride_count":26912
+    },
+    {
+        "start_station_name":"Theater on the Lake",
+        "ride_count":26829
+    },
+    {
+        "start_station_name":"Wells St & Elm St",
+        "ride_count":26346
+    },
+    {
+        "start_station_name":"State St & Chicago Ave",
+        "ride_count":25785
+    }
+]
