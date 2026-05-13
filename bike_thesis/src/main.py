@@ -5,12 +5,14 @@ This script orchestrates both Progress Report 1 and Progress Report 2 workflows.
 
 Available pipeline stages
 -------------------------
-1) Load raw data + preprocess trip-level data (with caching)
-2) Run exploratory data analysis (EDA)
-3) Build station-hour demand dataset (with caching)
-4) Run baseline forecasting
-5) Train machine learning forecasting models
-6) Generate model evaluation plots
+1) Load raw data
+2) Preprocess trip-level data (with caching)
+3) Run exploratory data analysis (EDA)
+4) Build station-hour demand dataset (with caching)
+8) Run baseline forecasting (optional)
+9) Train machine learning forecasting models (optional)
+10) Generate model evaluation visualizations (optional)
+11) Export dashboard data (optional)
 
 Each stage can be enabled/disabled with boolean flags in main().
 """
@@ -34,7 +36,7 @@ from demand_dataset import (
 )
 from baseline_model import run_baseline_forecast_pipeline
 from train_models import run_training_pipeline
-from model_visualization import run_all_model_visualizations
+from model_visualization import run_all_model_plots
 
 
 def get_project_root() -> Path:
@@ -98,6 +100,10 @@ def main(
     run_baseline_stage: bool = False,
     run_ml_stage: bool = False,
     run_model_visualization_stage: bool = False,
+    run_full_dataset_experiment: bool = False,
+    run_busy_stations_experiment: bool = True,
+    top_n_busy_stations: int = 20,
+    run_export_dashboard_stage: bool = False,
 ) -> None:
     """
     Run thesis data and forecasting pipeline for a given year.
@@ -122,6 +128,14 @@ def main(
         If True, run ML model training/evaluation.
     run_model_visualization_stage : bool
         If True, generate forecast result visualization plots.
+    run_full_dataset_experiment : bool
+        If True, runs the model across all stations.
+    run_busy_stations_experiment : bool
+        If True, also run busy-station-only ML experiment.
+    top_n_busy_stations : int
+        Number of busiest stations to keep in busy-station experiment.
+    run_export_dashboard_stage : bool
+        If True, export JSON/CSV data for the UI dashboard.
     """
     print(f"=== Divvy Bike Thesis Pipeline for {year} ===")
 
@@ -137,6 +151,7 @@ def main(
         run_data_preparation
         or run_eda_stage
         or run_demand_dataset_stage
+        or run_export_dashboard_stage
         or (
             (run_baseline_stage or run_ml_stage or run_model_visualization_stage)
             and (not demand_path.exists() or force_preprocess)
@@ -211,25 +226,43 @@ def main(
         print("\nStep 5: Printing summary statistics...")
         print_basic_summary_statistics(trips_clean)
 
-    # Stage: baseline forecasting
+    # Stage 8: baseline forecasting
     if run_baseline_stage:
-        print("\nStep 6: Running baseline forecasting...")
+        print("\nStep 8: Running baseline forecasting...")
         run_baseline_forecast_pipeline(year=year, train_end_month=10)
 
-    # Stage: machine learning forecasting
+    # Stage 9: machine learning forecasting
     if run_ml_stage:
-        print("\nStep 7: Training machine learning forecasting models...")
-        run_training_pipeline(year=year, train_end_month=10)
-
-    # Stage: model evaluation plots
-    if run_model_visualization_stage:
-        print("\nStep 8: Generating model evaluation plots...")
-        run_all_model_visualizations(
+        print("\nStep 9: Training machine learning forecasting models...")
+        run_training_pipeline(
             year=year,
+            train_end_month=10,
+            fast_models_only=True,
+            enable_slow_models=False,
+            run_full_dataset_experiment=run_full_dataset_experiment,
+            run_busy_stations_experiment=run_busy_stations_experiment,
+            top_n_busy_stations=top_n_busy_stations,
+        )
+
+    # Stage 10: model evaluation visualizations
+    if run_model_visualization_stage:
+        print("\nStep 10: Generating model evaluation visualizations...")
+        run_all_model_plots(
             station_id_for_line_plot=None,
             line_start_time=None,
             line_end_time=None,
         )
+
+    # Stage 11: dashboard data exports
+    if run_export_dashboard_stage:
+        if trips_clean is None:
+            raise ValueError(
+                "Dashboard export stage requires trip-level datasets. "
+                "Enable run_data_preparation=True."
+            )
+        print("\nStep 11: Exporting dashboard data...")
+        from export_dashboard_data import run_all_dashboard_exports
+        run_all_dashboard_exports(trips_clean)
 
     print("=== Pipeline completed successfully. ===")
 
@@ -239,7 +272,7 @@ if __name__ == "__main__":
     # - data preparation (load + preprocess with caching)
     # - demand dataset generation (cached)
     # - EDA + summary statistics
-    # Forecast/model stages are optional and off by default.
+    # Forecast/model stages can also run automatically.
     main(
         year=2025,
         force_preprocess=False,
@@ -247,8 +280,11 @@ if __name__ == "__main__":
         run_data_preparation=True,
         run_eda_stage=True,
         run_demand_dataset_stage=True,
-        run_baseline_stage=False,
-        run_ml_stage=False,
-        run_model_visualization_stage=False,
+        run_baseline_stage=True,
+        run_ml_stage=True,
+        run_model_visualization_stage=True,
+        run_full_dataset_experiment=False,
+        run_busy_stations_experiment=True,
+        top_n_busy_stations=20,
+        run_export_dashboard_stage=True,
     )
-

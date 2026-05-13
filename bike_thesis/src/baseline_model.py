@@ -48,21 +48,35 @@ def get_processed_data_folder() -> Path:
     return get_project_root() / "data" / "processed"
 
 
-def get_baseline_predictions_path(year: int = 2025) -> Path:
+def get_predictions_output_folder() -> Path:
     """
-    Return output path for actual-vs-predicted baseline CSV.
+    Return output folder for prediction CSV files.
     """
-    return get_processed_data_folder() / f"baseline_predictions_{year}.csv"
+    return get_project_root() / "outputs" / "predictions"
 
 
-def get_baseline_metrics_path(year: int = 2025) -> Path:
+def get_metrics_output_folder() -> Path:
     """
-    Return output path for baseline metrics text file.
+    Return output folder for metrics CSV files.
     """
-    return get_processed_data_folder() / f"baseline_metrics_{year}.txt"
+    return get_project_root() / "outputs" / "metrics"
 
 
-def load_demand_data(year: int = 2025) -> pd.DataFrame:
+def get_baseline_predictions_path() -> Path:
+    """
+    Return canonical baseline predictions output path.
+    """
+    return get_predictions_output_folder() / "baseline_predictions.csv"
+
+
+def get_baseline_metrics_path() -> Path:
+    """
+    Return canonical baseline metrics output path.
+    """
+    return get_metrics_output_folder() / "baseline_metrics.csv"
+
+
+def load_demand_dataset(year: int = 2025) -> pd.DataFrame:
     """
     Load station-hour demand dataset from data/processed/.
     """
@@ -84,6 +98,14 @@ def load_demand_data(year: int = 2025) -> pd.DataFrame:
     df = df.dropna(subset=["timestamp_hour"]).copy()
 
     return df
+
+
+# Backward-compatible alias used in earlier steps of the project.
+def load_demand_data(year: int = 2025) -> pd.DataFrame:
+    """
+    Alias for load_demand_dataset().
+    """
+    return load_demand_dataset(year=year)
 
 
 def split_train_test_chronologically(
@@ -129,7 +151,7 @@ def split_train_test_chronologically(
     return train_df, test_df
 
 
-def fit_historical_average_baseline(train_df: pd.DataFrame) -> Dict[str, pd.Series]:
+def fit_baseline_model(train_df: pd.DataFrame) -> Dict[str, pd.Series]:
     """
     Fit historical-average baseline components from training data.
 
@@ -166,7 +188,15 @@ def fit_historical_average_baseline(train_df: pd.DataFrame) -> Dict[str, pd.Seri
     return baseline_model
 
 
-def predict_with_baseline(
+# Backward-compatible alias
+def fit_historical_average_baseline(train_df: pd.DataFrame) -> Dict[str, pd.Series]:
+    """
+    Alias for fit_baseline_model().
+    """
+    return fit_baseline_model(train_df)
+
+
+def predict_baseline(
     test_df: pd.DataFrame,
     baseline_model: Dict[str, pd.Series],
 ) -> pd.DataFrame:
@@ -212,7 +242,17 @@ def predict_with_baseline(
     return preds
 
 
-def evaluate_regression_model(
+def predict_with_baseline(
+    test_df: pd.DataFrame,
+    baseline_model: Dict[str, pd.Series],
+) -> pd.DataFrame:
+    """
+    Alias for predict_baseline().
+    """
+    return predict_baseline(test_df=test_df, baseline_model=baseline_model)
+
+
+def evaluate_baseline(
     y_true: pd.Series,
     y_pred: pd.Series,
 ) -> Dict[str, float]:
@@ -224,6 +264,71 @@ def evaluate_regression_model(
     r2 = r2_score(y_true, y_pred)
 
     return {"mae": float(mae), "rmse": rmse, "r2": float(r2)}
+
+
+def evaluate_regression_model(
+    y_true: pd.Series,
+    y_pred: pd.Series,
+) -> Dict[str, float]:
+    """
+    Alias for evaluate_baseline().
+    """
+    return evaluate_baseline(y_true=y_true, y_pred=y_pred)
+
+
+def save_baseline_outputs(
+    predictions_df: pd.DataFrame,
+    metrics: Dict[str, float],
+    year: int = 2025,
+    train_end_month: int = 10,
+) -> Tuple[Path, Path]:
+    """
+    Save baseline predictions and metrics to thesis output folders.
+
+    Files:
+    - outputs/predictions/baseline_predictions.csv
+    - outputs/metrics/baseline_metrics.csv
+    """
+    predictions_folder = get_predictions_output_folder()
+    metrics_folder = get_metrics_output_folder()
+    predictions_folder.mkdir(parents=True, exist_ok=True)
+    metrics_folder.mkdir(parents=True, exist_ok=True)
+
+    predictions_path = get_baseline_predictions_path()
+    metrics_path = get_baseline_metrics_path()
+
+    # Keep a compact predictions file for easy plotting/comparison.
+    prediction_columns = [
+        col
+        for col in [
+            "start_station_id",
+            "start_station_name",
+            "timestamp_hour",
+            "weekday",
+            "hour",
+            "demand",
+            "predicted_demand",
+        ]
+        if col in predictions_df.columns
+    ]
+    predictions_df[prediction_columns].to_csv(predictions_path, index=False)
+
+    metrics_df = pd.DataFrame(
+        [
+            {
+                "model": "historical_average_baseline",
+                "year": year,
+                "train_months": f"1-{train_end_month}",
+                "test_months": f"{train_end_month + 1}-12",
+                "mae": metrics["mae"],
+                "rmse": metrics["rmse"],
+                "r2": metrics["r2"],
+            }
+        ]
+    )
+    metrics_df.to_csv(metrics_path, index=False)
+
+    return predictions_path, metrics_path
 
 
 def run_baseline_forecast_pipeline(
@@ -238,39 +343,28 @@ def run_baseline_forecast_pipeline(
     4) Predict test demand
     5) Evaluate and save outputs
     """
-    demand_df = load_demand_data(year=year)
+    demand_df = load_demand_dataset(year=year)
     train_df, test_df = split_train_test_chronologically(
         demand_df, train_end_month=train_end_month, year=year
     )
 
-    baseline_model = fit_historical_average_baseline(train_df)
-    preds_df = predict_with_baseline(test_df, baseline_model)
+    baseline_model = fit_baseline_model(train_df)
+    preds_df = predict_baseline(test_df, baseline_model)
 
-    metrics = evaluate_regression_model(
+    metrics = evaluate_baseline(
         y_true=preds_df["demand"],
         y_pred=preds_df["predicted_demand"],
     )
 
-    # Save output files in processed folder.
-    processed_folder = get_processed_data_folder()
-    processed_folder.mkdir(parents=True, exist_ok=True)
-
-    predictions_path = get_baseline_predictions_path(year=year)
-    metrics_path = get_baseline_metrics_path(year=year)
-
-    preds_df.to_csv(predictions_path, index=False)
-
-    metrics_text = (
-        f"Baseline Forecast Metrics ({year})\n"
-        f"Train months: 1-{train_end_month}\n"
-        f"Test months: {train_end_month + 1}-12\n"
-        f"MAE: {metrics['mae']:.4f}\n"
-        f"RMSE: {metrics['rmse']:.4f}\n"
-        f"R2: {metrics['r2']:.4f}\n"
+    predictions_path, metrics_path = save_baseline_outputs(
+        predictions_df=preds_df,
+        metrics=metrics,
+        year=year,
+        train_end_month=train_end_month,
     )
-    metrics_path.write_text(metrics_text, encoding="utf-8")
 
     print("\n=== Baseline Forecast Evaluation ===")
+    print(f"Train months: 1-{train_end_month} | Test months: {train_end_month + 1}-12")
     print(f"MAE : {metrics['mae']:.4f}")
     print(f"RMSE: {metrics['rmse']:.4f}")
     print(f"R2  : {metrics['r2']:.4f}")

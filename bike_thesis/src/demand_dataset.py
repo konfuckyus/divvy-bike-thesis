@@ -9,8 +9,8 @@ For Progress Report 2, we aggregate rides by:
 - start_station_name
 - timestamp_hour (started_at floored to hour)
 
-Then we create additional time-based features that will be useful later
-for demand analysis and prediction tasks.
+Then we create additional time-based features that are useful for
+forecasting-focused thesis experiments.
 """
 
 from pathlib import Path
@@ -48,16 +48,16 @@ def add_forecasting_features(demand_df: pd.DataFrame) -> pd.DataFrame:
 
     Why these features matter
     -------------------------
-    For demand forecasting, the most predictive information is usually:
+    For demand forecasting, predictive signals usually come from:
     - recent demand history (lag features),
-    - short/medium-term trend (rolling means),
-    - calendar position (weekday/month effects).
+    - short/medium-term trend (rolling averages),
+    - calendar effects (weekday, month, season, peak-hour behavior).
 
     Important modeling note
     -----------------------
     We intentionally keep NaN values created by lag/rolling operations.
     These NaNs appear at the beginning of each station time series because
-    there is not enough past history yet. During model training, you may
+    there is not enough past history yet. During model training, you can
     later drop or impute these rows depending on your strategy.
     """
     print("Adding lag and rolling forecasting features...")
@@ -68,10 +68,15 @@ def add_forecasting_features(demand_df: pd.DataFrame) -> pd.DataFrame:
     station_groups = df.groupby("start_station_id")["demand"]
 
     # Lag features: demand from specific previous hours.
+    # These capture short-term memory and daily repetition patterns.
     df["prev_hour_demand"] = station_groups.shift(1)
     df["prev_2hour_demand"] = station_groups.shift(2)
     df["prev_3hour_demand"] = station_groups.shift(3)
     df["prev_24hour_demand"] = station_groups.shift(24)
+    df["prev_day_same_hour_demand"] = station_groups.shift(24)
+    
+    # New feature: 1 week lag (168 hours) to capture weekly repeating patterns
+    df["prev_week_same_hour_demand"] = station_groups.shift(168)
 
     # Rolling means must use ONLY past information.
     # We first shift by 1 hour to exclude current-hour demand, then roll.
@@ -81,13 +86,44 @@ def add_forecasting_features(demand_df: pd.DataFrame) -> pd.DataFrame:
     df["rolling_mean_6h"] = (
         station_groups.shift(1).rolling(window=6, min_periods=1).mean()
     )
+    df["rolling_mean_12h"] = (
+        station_groups.shift(1).rolling(window=12, min_periods=1).mean()
+    )
     df["rolling_mean_24h"] = (
         station_groups.shift(1).rolling(window=24, min_periods=1).mean()
+    )
+    
+    # New feature: short-term volatility 
+    df["rolling_std_24h"] = (
+        station_groups.shift(1).rolling(window=24, min_periods=1).std()
     )
 
     # Numeric calendar features are model-friendly for many algorithms.
     df["weekday_num"] = df["timestamp_hour"].dt.weekday
     df["month_num"] = df["timestamp_hour"].dt.month
+
+    # Peak-hour indicator often helps commuter-demand forecasting.
+    # Typical commute windows: 07-09 and 16-18.
+    df["is_peak_hour"] = (
+        df["timestamp_hour"].dt.hour.isin([7, 8, 9, 16, 17, 18])
+    ).astype(int)
+
+    # Seasonal label can capture broad weather and behavior shifts.
+    month_to_season = {
+        12: "winter",
+        1: "winter",
+        2: "winter",
+        3: "spring",
+        4: "spring",
+        5: "spring",
+        6: "summer",
+        7: "summer",
+        8: "summer",
+        9: "autumn",
+        10: "autumn",
+        11: "autumn",
+    }
+    df["season"] = df["month_num"].map(month_to_season)
 
     print("Forecasting features added successfully.")
 
